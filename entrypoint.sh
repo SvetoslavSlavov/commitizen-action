@@ -1,12 +1,10 @@
-#!/usr/bin/env bash
-
 set -e
 
 # Reporting
 gpg --version
 git --version
 
-if [[ -z $INPUT_GITHUB_TOKEN && $INPUT_PUSH == "true" ]]; then
+if [[ -z $GITHUB_TOKEN && $INPUT_PUSH == "true" ]]; then
   echo 'Missing input "github_token: ${{ secrets.GITHUB_TOKEN }}" which is required to push.' >&2
   exit 1
 fi
@@ -21,6 +19,15 @@ git config --local user.email "${INPUT_GIT_EMAIL}"
 git config --local pull.rebase true
 echo "Git name: $(git config --get user.name)"
 echo "Git email: $(git config --get user.email)"
+
+# Decode and import GPG key
+echo "${INPUT_GPG_PRIVATE_KEY}" | base64 -d | gpg --batch --yes --passphrase "${INPUT_GPG_PASSPHRASE}" --import
+gpg --list-secret-keys --keyid-format LONG
+
+# Configure Git to use GPG key for signing commits
+GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep 'sec' | awk '{print $2}' | cut -d'/' -f2)
+git config --local user.signingkey "${GPG_KEY_ID}"
+git config --local commit.gpgSign true
 
 PIP_CMD=('pip' 'install')
 if [[ $INPUT_COMMITIZEN_VERSION == 'latest' ]]; then
